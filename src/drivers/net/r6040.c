@@ -498,7 +498,6 @@ static void r6040_set_carrier(struct mii_if_info *mii)
 {
 	if (r6040_phy_mode_chk(mii->dev)) {
 		/* autoneg is off: Link is always assumed to be up */
-		DBG("Cottsay: Link is assumed to be UP\n");
 		if (!netdev_link_ok(mii->dev))
 			netdev_link_up(mii->dev);
 	} else
@@ -520,8 +519,6 @@ static void r6040_set_carrier(struct mii_if_info *mii)
 
 //static void r6040_adjust_link(struct net_device *dev __unused)
 //{
-//	/* TODO: Cottsay - Hack */
-//	DBG("Cottsay: Link Change Interrupt");
 //	netdev_link_up(dev);
 //	struct r6040_private *lp = netdev_priv(dev);
 //	struct phy_device *phydev = lp->phydev;
@@ -634,9 +631,9 @@ static void r6040_tx(struct net_device *dev)
 		err = readw(ioaddr + MLSR);
 
 //		if (err & 0x0200)
-//			netdev_rx_err(dev, NULL, EIO);
+//			netdev_tx_err(dev, NULL, EIO);
 //		if (err & (0x2000 | 0x4000))
-//			netdev_rx_err(dev, NULL, EIO);
+//			netdev_tx_err(dev, NULL, EIO);
 
 		if (descptr->status & DSC_OWNER_MAC)
 			break; /* Not complete */
@@ -665,7 +662,7 @@ static int r6040_poll(struct net_device *dev, int budget)
 
 	work_done = r6040_rx(dev, budget);
 
-	if (work_done < budget && priv->ier) {
+	if (work_done < budget) {
 		/* Enable RX interrupt */
 		writew(readw(ioaddr + MIER) | RX_INTS, ioaddr + MIER);
 	}
@@ -694,10 +691,7 @@ static void r6040_interrupt(struct net_device *dev)
 
 	/* Link change interrupt */
 	if(status & LINK_CHANGED)
-	{
-		DBG("Cottsay: Link Changed!\n");
 		r6040_set_carrier(&lp->mii_if);
-	}
 
 	/* RX interrupt request */
 	if (status & RX_INTS) {
@@ -797,6 +791,7 @@ static int r6040_open(struct net_device *dev)
 		goto err_free_irq;
 	}
 	lp->rx_ring_dma = virt_to_bus(lp->rx_ring);
+	memset(lp->rx_ring, 0, RX_DESC_SIZE);
 
 	lp->tx_ring = malloc_dma(TX_DESC_SIZE, 32);
 	if (!lp->tx_ring) {
@@ -804,6 +799,7 @@ static int r6040_open(struct net_device *dev)
 		goto err_free_rx_ring;
 	}
 	lp->tx_ring_dma = virt_to_bus(lp->tx_ring);
+	memset(lp->tx_ring, 0, TX_DESC_SIZE);
 
 	ret = r6040_up(dev);
 	if (ret)
@@ -863,8 +859,6 @@ static void r6040_irq(struct net_device *dev, int enable)
 {
 	struct r6040_private *lp = netdev_priv(dev);
 	void *ioaddr = lp->base;
-
-	DBG("Cottsay: IRQ is %d", enable);
 
 	if( ( lp->ier = enable ) )
 		writew(INT_MASK, ioaddr + MIER); /* Enable interrupts */
